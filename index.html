@@ -39,7 +39,7 @@
             height: 100%;
             object-fit: cover;
         }
-        /* Flip video horizontally only if facingMode is 'user' (Front Camera) */
+        /* Class for mirroring the video stream (typically for front camera) */
         .mirrored {
              transform: scaleX(-1);
         }
@@ -59,6 +59,11 @@
             pointer-events: none;
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
+        /* Style for the active button */
+        .active-mode {
+            background-color: #8b5cf6 !important; /* Violet 500 */
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.5);
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 min-h-screen p-4 sm:p-8">
@@ -67,7 +72,7 @@
         <!-- Header -->
         <header class="text-center mb-10 p-4 border-b border-gray-700">
             <h1 class="text-3xl sm:text-4xl font-extrabold text-yellow-400 tracking-wider">SMART BANANA LIVE ANALYZER</h1>
-            <p class="text-gray-400 mt-2">Analisis Kematangan Pisang Real-time via Kamera Laptop/Ponsel</p>
+            <p class="text-gray-400 mt-2">Analisis Kematangan Pisang Real-time via Kamera</p>
         </header>
 
         <!-- Main Dashboard Layout -->
@@ -85,13 +90,22 @@
                     <p id="camera-status" class="absolute top-1/2 left-0 w-full text-center text-red-400 font-bold z-20">Memuat kamera...</p>
                 </div>
                 
-                <!-- Camera Control Button -->
-                <div class="mt-4 flex justify-center">
-                    <button id="camera-switch-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 disabled:opacity-50" disabled>
+                <!-- Camera Control Buttons (Dua Tombol Terpisah) -->
+                <div class="mt-4 flex justify-between gap-4">
+                    <!-- Tombol 1: Kamera Depan (Webcam) -->
+                    <button id="front-camera-button" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 disabled:opacity-50 text-sm" disabled onclick="startCamera('user')">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 inline-block mr-2">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181-3.181-3.182-3.182A4.5 4.5 0 0116.364 13.91l-3.32 3.32c1.776-.79 3.553-2.614 3.553-2.614zM15.406 13.906a5.524 5.524 0 00-6.702-4.237l-3.32 3.32a5.524 5.524 0 00-4.237 6.702M19.998 7.373A5.524 5.524 0 0013.296 4.19l-3.32 3.32a5.524 5.524 0 00-4.237 6.702M19.644 16.015v4.992m0 0h-4.992m4.992 0l-3.181-3.181-3.182 3.182A4.5 4.5 0 017.636 10.09l3.32-3.32c-1.776.79-3.553 2.614-3.553 2.614z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a1.238 1.238 0 010-.244M4.5 20.118c.211-.017.42-.057.625-.119m-4.374.363a1.5 1.5 0 00-.81 1.096m8.25-1.472a1.238 1.238 0 010-.244M8.25 18.75c.211-.017.42-.057.625-.119m-4.374.363a1.5 1.5 0 00-.81 1.096m8.25-1.472c.328 0 .647-.037.954-.108M13.5 18.75h-.75m3.75 0h.75m-4.5 0c-.328 0-.647-.037-.954-.108m8.25-1.472a1.238 1.238 0 010-.244M19.5 20.118c-.211-.017-.42-.057-.625-.119m-4.374.363a1.5 1.5 0 00-.81 1.096m8.25-1.472a1.238 1.238 0 010-.244M19.5 20.118c-.211-.017-.42-.057-.625-.119m-4.374.363a1.5 1.5 0 00-.81 1.096M15 18.75h-.75m3.75 0h.75m-4.5 0c-.328 0-.647-.037-.954-.108m8.25-1.472c-.211-.017-.42-.057-.625-.119M13.5 18.75c-.328 0-.647-.037-.954-.108m-4.374.363a1.5 1.5 0 00-.81 1.096M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM12 21.75v-1.5m0-13.5v-1.5m0 3a1.5 1.5 0 00-1.5-1.5H10.5m1.5 1.5H13.5m-1.5 0a1.5 1.5 0 01-1.5 1.5H10.5m1.5-1.5a1.5 1.5 0 001.5 1.5H13.5" />
                         </svg>
-                        Ganti Kamera (<span id="current-camera-mode">Memuat...</span>)
+                        Kamera Depan (Webcam)
+                    </button>
+
+                    <!-- Tombol 2: Kamera Belakang (Analisis) -->
+                    <button id="back-camera-button" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 disabled:opacity-50 text-sm" disabled onclick="startCamera('environment')">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 inline-block mr-2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.72 2.72 0 019 5.25h1.5l.374 1.258A2.72 2.72 0 0012 8.25h2.25l-.105.249c-.21.417-.111.95.213 1.267l1.011 1.01a1.05 1.05 0 010 1.485l-1.011 1.01c-.324.317-.423.85-.213 1.267l.105.249H12a2.72 2.72 0 00-1.124-.874L9 18.75h-1.5a2.72 2.72 0 01-2.173-.905L4.75 16.5V7.5l2.077-1.325z" />
+                        </svg>
+                        Kamera Belakang (Analisis)
                     </button>
                 </div>
                 
@@ -219,9 +233,9 @@
             co2Bar: document.getElementById('co2-bar'),
             phBar: document.getElementById('ph-bar'),
             humidityBar: document.getElementById('humidity-bar'),
-            // New elements for camera control
-            cameraSwitchButton: document.getElementById('camera-switch-button'),
-            currentCameraModeSpan: document.getElementById('current-camera-mode'),
+            // Elements for camera control
+            frontCameraButton: document.getElementById('front-camera-button'),
+            backCameraButton: document.getElementById('back-camera-button'),
         };
 
         const MAX_CO2 = 600; 
@@ -232,12 +246,12 @@
         const ctx = elements.canvas.getContext('2d');
         let animationFrameId;
         let currentStream = null;
-        let currentFacingMode = 'environment'; // Default: coba kamera belakang
+        let currentFacingMode = null; // Menyimpan mode kamera yang sedang aktif
 
         // Fungsi utilitas untuk mendapatkan nilai acak dalam rentang
         const getRandom = (min, max) => (Math.random() * (max - min) + min);
 
-        // --- Logika Simulasi Sensor (Terjemahan dari Python) ---
+        // --- Logika Simulasi Sensor ---
         function simulateSensor(status) {
             let co2 = 0.0;
             let ph = 0.0;
@@ -268,7 +282,7 @@
             };
         }
 
-        // --- Logika Klasifikasi Hue (Terjemahan dari Python) ---
+        // --- Logika Klasifikasi Hue ---
         function classifyHue(hueValue) {
             if (hueValue > HUE_SCALE_MAX || hueValue < 0) {
                  return { status: "Tidak Terdeteksi", key: "none", desc: "Hue tidak relevan untuk pisang" };
@@ -285,8 +299,7 @@
             return { status: "Tidak Terdeteksi", key: "none", desc: "Diluar Rentang Hue Pisang (0-80)" };
         }
         
-        // --- Konversi RGB ke HSV (Diperlukan karena Canvas hanya memberikan data RGB) ---
-        // Mengembalikan nilai Hue dalam rentang 0-179 (sesuai standar OpenCV/Python)
+        // --- Konversi RGB ke HSV ---
         function rgbToHue(r, g, b) {
             r /= 255;
             g /= 255;
@@ -329,8 +342,7 @@
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Ambil sampel piksel dari area tengah (marker)
-            const sampleSize = 20; // Ambil rata-rata dari 40x40 piksel
+            const sampleSize = 20; 
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
@@ -338,7 +350,6 @@
             let pixelCount = 0;
 
             try {
-                // Ambil data piksel di sekitar titik pusat
                 const imageData = ctx.getImageData(centerX - sampleSize / 2, centerY - sampleSize / 2, sampleSize, sampleSize);
                 const data = imageData.data;
 
@@ -347,9 +358,6 @@
                     const g = data[i + 1];
                     const b = data[i + 2];
                     
-                    // Kita hanya tertarik pada piksel yang memiliki nilai S dan V yang cukup tinggi
-                    // untuk memastikan itu adalah objek berwarna, bukan bayangan hitam/putih.
-                    // Ini mensimulasikan ambang batas (thresholding) pada S dan V.
                     const brightness = (r + g + b) / 3;
                     if (brightness > 50) { // Batas kecerahan dasar
                         const hue = rgbToHue(r, g, b);
@@ -359,9 +367,8 @@
                 }
             } catch (e) {
                 console.error("Error accessing pixel data:", e);
-                pixelCount = 0; // Gagal ambil data, atur ke 0
+                pixelCount = 0; 
             }
-
 
             let avgHue = 0;
             let classification;
@@ -370,7 +377,6 @@
                 avgHue = Math.round(sumHue / pixelCount);
                 classification = classifyHue(avgHue);
             } else {
-                // Objek yang dideteksi tidak cukup besar atau terlalu gelap
                 classification = { status: "Arahkan Objek", key: "none", desc: "Tempatkan pisang di lingkaran fokus" };
                 avgHue = '--';
             }
@@ -417,13 +423,30 @@
                 currentStream.getTracks().forEach(track => track.stop());
                 currentStream = null;
             }
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+        
+        // --- Fungsi untuk menandai tombol yang aktif ---
+        function highlightActiveButton(mode) {
+            elements.frontCameraButton.classList.remove('active-mode');
+            elements.backCameraButton.classList.remove('active-mode');
+
+            if (mode === 'user') {
+                elements.frontCameraButton.classList.add('active-mode');
+            } else if (mode === 'environment') {
+                elements.backCameraButton.classList.add('active-mode');
+            }
         }
 
-        // --- Inisialisasi/Mulai Kamera ---
-        async function startCamera(facingMode) {
+        // --- Inisialisasi/Mulai Kamera (Dibuat Global) ---
+        window.startCamera = async function(facingMode) {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 elements.cameraStatus.textContent = "Browser tidak mendukung akses kamera (getUserMedia).";
-                elements.cameraSwitchButton.disabled = true;
+                elements.frontCameraButton.disabled = true;
+                elements.backCameraButton.disabled = true;
                 return;
             }
 
@@ -431,14 +454,18 @@
             
             elements.cameraStatus.style.display = 'block';
             elements.cameraStatus.textContent = `Memuat kamera (${facingMode === 'user' ? 'Depan' : 'Belakang'})...`;
-            elements.cameraSwitchButton.disabled = true;
-            
+            elements.frontCameraButton.disabled = true;
+            elements.backCameraButton.disabled = true;
+
             // Atur mode cermin (mirror)
             if (facingMode === 'user') {
                 elements.video.classList.add('mirrored');
             } else {
                 elements.video.classList.remove('mirrored');
             }
+            
+            // Highlight mode yang dipilih, bahkan sebelum berhasil
+            highlightActiveButton(facingMode);
 
             const constraints = {
                 video: {
@@ -455,46 +482,43 @@
                 elements.video.onloadedmetadata = () => {
                     elements.video.play();
                     elements.cameraStatus.style.display = 'none';
-                    elements.cameraSwitchButton.disabled = false;
-                    elements.currentCameraModeSpan.textContent = facingMode === 'user' ? 'Depan' : 'Belakang';
-                    
-                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-                    
-                    // Tunggu sebentar agar video stabil sebelum memulai analisis
+                    elements.frontCameraButton.disabled = false;
+                    elements.backCameraButton.disabled = false;
+                    highlightActiveButton(currentFacingMode); // Konfirmasi highlight
+
+                    // Start analisis setelah video dimuat
                     setTimeout(() => {
+                        if (animationFrameId) cancelAnimationFrame(animationFrameId);
                         animationFrameId = requestAnimationFrame(analyzeFrame);
                     }, 500);
                 };
             } catch (err) {
                 console.warn(`Gagal mengakses kamera ${facingMode}:`, err);
                 
-                // Logika Fallback: Jika kamera 'environment' gagal, coba 'user'
+                // Logika Fallback: Jika mode yang dipilih gagal, coba mode yang lain
                 if (facingMode === 'environment') {
+                    // Jika kamera belakang gagal/tidak ada, coba kamera depan
                     elements.cameraStatus.textContent = "Kamera belakang gagal/tidak ada. Mencoba kamera depan...";
                     await startCamera('user');
                 } else if (facingMode === 'user') {
-                    // Jika kedua-duanya gagal
+                    // Jika kamera depan gagal/tidak ada, coba kamera belakang (untuk kasus desktop)
+                    elements.cameraStatus.textContent = "Kamera depan gagal/tidak ada. Mencoba kamera belakang...";
+                    await startCamera('environment');
+                } else {
+                     // Jika kedua-duanya gagal
                     elements.cameraStatus.textContent = "Akses kamera ditolak atau tidak tersedia. Silakan cek izin browser Anda.";
-                    elements.cameraSwitchButton.disabled = true;
-                    elements.currentCameraModeSpan.textContent = 'Gagal';
+                    elements.frontCameraButton.disabled = false;
+                    elements.backCameraButton.disabled = false;
+                    highlightActiveButton(null);
                 }
             }
         }
-        
-        function switchCamera() {
-            // Toggle mode: user (Depan) <-> environment (Belakang)
-            const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-            startCamera(newFacingMode);
-        }
-
 
         // --- Start ---
         document.addEventListener('DOMContentLoaded', () => {
-             // ** PENTING: Menghubungkan fungsi switchCamera ke tombol **
-            elements.cameraSwitchButton.addEventListener('click', switchCamera);
-            
-            // Start with environment camera (back camera on mobile)
-            startCamera(currentFacingMode); 
+            // Coba mulai dengan mode environment (kamera belakang) karena lebih ideal untuk analisis objek.
+            // Jika gagal, logika fallback akan otomatis mencoba 'user' (kamera depan/webcam).
+            startCamera('environment'); 
         });
 
     </script>
