@@ -1,10 +1,424 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Banana Analyzer</title>
-  </head>
-  <body>
-    <h1>Banana Analyzer Project</h1>
-    <p>File Python ada di repositori, tidak bisa dijalankan lewat GitHub Pages.</p>
-  </body>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Banana Live Analyzer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Custom color classes (used in JS to set background/border colors dynamically) */
+        .color-segar { background-color: #a3e635; } /* Lime 400 */
+        .color-optimal { background-color: #fbbf24; } /* Amber 400 */
+        .color-busuk { background-color: #ef4444; } /* Red 500 */
+        
+        .border-segar { border-color: #a3e635; }
+        .border-optimal { border-color: #fbbf24; }
+        .border-busuk { border-color: #ef4444; }
+
+        /* Webcam view styling */
+        #video-container {
+            position: relative;
+            width: 100%;
+            padding-top: 75%; /* 4:3 Aspect Ratio */
+            border-radius: 0.75rem; /* rounded-xl */
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-2xl */
+        }
+        #videoElement, #canvasElement {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Flip horizontally (mirror effect like a selfie cam) */
+        }
+        #canvasElement { display: none; } /* Canvas is used for processing, not display */
+        
+        /* Focus marker to show where the Hue is being sampled */
+        #focus-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border: 3px solid white;
+            border-radius: 50%;
+            z-index: 10;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 min-h-screen p-4 sm:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-10 p-4 border-b border-gray-700">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-yellow-400 tracking-wider">SMART BANANA LIVE ANALYZER</h1>
+            <p class="text-gray-400 mt-2">Analisis Kematangan Pisang Real-time via Kamera Laptop</p>
+        </header>
+
+        <!-- Main Dashboard Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- 1. Live Camera Feed (Left Column) -->
+            <div class="lg:col-span-1 bg-gray-800 p-4 rounded-xl shadow-2xl h-full">
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2 text-white">Input Kamera</h2>
+                
+                <div id="video-container">
+                    <video id="videoElement" autoplay playsinline></video>
+                    <canvas id="canvasElement"></canvas>
+                    <div id="focus-marker"></div>
+                    
+                    <p id="camera-status" class="absolute top-1/2 left-0 w-full text-center text-red-400 font-bold z-20">Memuat kamera...</p>
+                </div>
+                
+                <!-- Hue Value Display -->
+                <div id="hue-display" class="mt-4 p-4 bg-gray-900 rounded-lg text-center">
+                    <p class="text-lg font-bold text-gray-400 mb-2">Nilai Hue yang Dideteksi</p>
+                    <p id="hue-value-display" class="text-5xl font-extrabold text-white">--</p>
+                    <p class="text-xs text-gray-500 mt-1">Rentang Pisang: 0 (Busuk) hingga 80 (Segar)</p>
+                </div>
+            </div>
+
+            <!-- 2. Sensor Data Visualization (Right Columns) -->
+            <div class="lg:col-span-2 space-y-8">
+
+                <!-- Current Status Card -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-2xl">
+                    <h2 class="text-2xl font-bold mb-4 text-center">STATUS KEMATANGAN SAAT INI</h2>
+                    <div id="current-status-card" class="text-center p-4 rounded-lg transition duration-500 border-4 border-gray-700">
+                        <p class="text-3xl font-extrabold text-gray-500">Arahkan Pisang ke Area Fokus</p>
+                        <p class="text-lg text-gray-400 mt-1">Menunggu deteksi warna...</p>
+                    </div>
+                </div>
+
+                <!-- Sensor Metrics Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                    <!-- Metric 1: Est. CO2 (Respiration) -->
+                    <div class="bg-gray-800 p-5 rounded-xl shadow-xl">
+                        <p class="text-sm font-medium text-gray-400">Est. Laju Respirasi</p>
+                        <h3 class="text-3xl font-bold text-teal-400 mt-1 flex items-baseline">
+                            <span id="co2-value">0.0</span> 
+                            <span class="text-base ml-1">ppm</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-2">Dinyatakan sebagai CO2. Tinggi = Puncak Klimakterik.</p>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5 mt-3">
+                            <div id="co2-bar" class="bg-teal-400 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <p id="co2-range" class="text-xs text-gray-500 text-right mt-1">Rentang: 200 - 600 ppm</p>
+                    </div>
+
+                    <!-- Metric 2: Est. pH (Acidity/Sweetness) -->
+                    <div class="bg-gray-800 p-5 rounded-xl shadow-xl">
+                        <p class="text-sm font-medium text-gray-400">Est. Keasaman / Gula</p>
+                        <h3 class="text-3xl font-bold text-indigo-400 mt-1 flex items-baseline">
+                            <span id="ph-value">0.00</span>
+                            <span class="text-base ml-1">pH</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-2">Menunjukkan konversi pati (asam) menjadi gula (netral).</p>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5 mt-3">
+                            <div id="ph-bar" class="bg-indigo-400 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <p id="ph-range" class="text-xs text-gray-500 text-right mt-1">Rentang: 4.5 - 7.0</p>
+                    </div>
+
+                    <!-- Metric 3: Est. Humidity (Water Content) -->
+                    <div class="bg-gray-800 p-5 rounded-xl shadow-xl">
+                        <p class="text-sm font-medium text-gray-400">Est. Kelembaban</p>
+                        <h3 class="text-3xl font-bold text-sky-400 mt-1 flex items-baseline">
+                            <span id="humidity-value">0.0</span>
+                            <span class="text-base ml-1">%</span>
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-2">Berkorelasi dengan tekstur buah (keras vs. lembek).</p>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5 mt-3">
+                            <div id="humidity-bar" class="bg-sky-400 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <p id="humidity-range" class="text-xs text-gray-500 text-right mt-1">Rentang: 60 - 90 %</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer / Disclaimer -->
+        <footer class="mt-12 p-4 text-center text-gray-500 text-xs border-t border-gray-700">
+            **DISCLAIMER:** Visualisasi ini didasarkan pada data **SIMULASI** biologis pisang yang dikorelasikan dengan nilai Hue (warna) di area fokus. Ini bukan pembacaan dari sensor fisik sungguhan.
+        </footer>
+    </div>
+
+    <script>
+        // Data sensor berdasarkan klasifikasi kematangan (Sama seperti Python)
+        const SENSOR_DATA = {
+            segar: {
+                name: "1. Segar",
+                desc: "Belum Matang (Pati Dominan)",
+                color: "color-segar",
+                co2: { min: 200, max: 350 },
+                ph: { min: 4.5, max: 5.2 },
+                humidity: { min: 85, max: 90 }
+            },
+            optimal: {
+                name: "2. Matang Optimal",
+                desc: "Siap Makan (Puncak Respirasi)",
+                color: "color-optimal",
+                co2: { min: 450, max: 600 },
+                ph: { min: 5.3, max: 6.2 },
+                humidity: { min: 80, max: 85 }
+            },
+            busuk: {
+                name: "3. Mulai Busuk",
+                desc: "Terlalu Matang (Fermentasi/Kerusakan Sel)",
+                color: "color-busuk",
+                co2: { min: 300, max: 500 },
+                ph: { min: 6.3, max: 7.0 },
+                humidity: { min: 60, max: 75 }
+            },
+            none: {
+                 name: "Tidak Terdeteksi",
+                 desc: "Diluar Rentang Hue Pisang (0-80)",
+                 color: "border-gray-700",
+                 co2: { min: 0, max: 0 },
+                 ph: { min: 0, max: 0 },
+                 humidity: { min: 0, max: 0 }
+            }
+        };
+
+        const elements = {
+            video: document.getElementById('videoElement'),
+            canvas: document.getElementById('canvasElement'),
+            cameraStatus: document.getElementById('camera-status'),
+            currentStatusCard: document.getElementById('current-status-card'),
+            hueValueDisplay: document.getElementById('hue-value-display'),
+            co2Value: document.getElementById('co2-value'),
+            phValue: document.getElementById('ph-value'),
+            humidityValue: document.getElementById('humidity-value'),
+            co2Bar: document.getElementById('co2-bar'),
+            phBar: document.getElementById('ph-bar'),
+            humidityBar: document.getElementById('humidity-bar'),
+        };
+
+        const MAX_CO2 = 600; 
+        const MAX_PH = 7.0; 
+        const MAX_HUMIDITY = 90; 
+        const HUE_SCALE_MAX = 80;
+
+        const ctx = elements.canvas.getContext('2d');
+        let animationFrameId;
+
+        // Fungsi utilitas untuk mendapatkan nilai acak dalam rentang
+        const getRandom = (min, max) => (Math.random() * (max - min) + min);
+
+        // --- Logika Simulasi Sensor (Terjemahan dari Python) ---
+        function simulateSensor(status) {
+            let co2 = 0.0;
+            let ph = 0.0;
+            let kelembaban = 0.0;
+        
+            if (status === "Segar") {
+                co2 = getRandom(200, 350);
+                ph = getRandom(4.5, 5.2);
+                kelembaban = getRandom(85, 90);
+            } else if (status === "Matang Optimal") {
+                co2 = getRandom(450, 600);
+                ph = getRandom(5.3, 6.2);
+                kelembaban = getRandom(80, 85);
+            } else if (status === "Mulai Busuk") {
+                co2 = getRandom(300, 500);
+                ph = getRandom(6.3, 7.0);
+                kelembaban = getRandom(60, 75);
+            } else { // none / not detected
+                co2 = 0.0;
+                ph = 0.0;
+                kelembaban = 0.0;
+            }
+        
+            return { 
+                co2: parseFloat(co2.toFixed(1)), 
+                ph: parseFloat(ph.toFixed(2)), 
+                humidity: parseFloat(kelembaban.toFixed(1)) 
+            };
+        }
+
+        // --- Logika Klasifikasi Hue (Terjemahan dari Python) ---
+        function classifyHue(hueValue) {
+            if (hueValue > HUE_SCALE_MAX || hueValue < 0) {
+                 return { status: "Tidak Terdeteksi", key: "none", desc: "Hue tidak relevan untuk pisang" };
+            }
+            if (40 <= hueValue && hueValue <= 80) {
+                return { status: "Segar", key: "segar", desc: "Belum Matang (Hue 40 - 80)" };
+            }
+            if (25 <= hueValue && hueValue <= 39) {
+                return { status: "Matang Optimal", key: "optimal", desc: "Siap Makan (Hue 25 - 39)" };
+            }
+            if (0 <= hueValue && hueValue <= 24) {
+                return { status: "Mulai Busuk", key: "busuk", desc: "Terlalu Matang (Hue 0 - 24)" };
+            }
+            return { status: "Tidak Terdeteksi", key: "none", desc: "Diluar Rentang Hue Pisang (0-80)" };
+        }
+        
+        // --- Konversi RGB ke HSV (Diperlukan karena Canvas hanya memberikan data RGB) ---
+        // Mengembalikan nilai Hue dalam rentang 0-179 (sesuai standar OpenCV/Python)
+        function rgbToHue(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+        
+            let h, max, min, diff;
+            
+            max = Math.max(r, g, b);
+            min = Math.min(r, g, b);
+            diff = max - min;
+        
+            if (diff === 0) {
+                h = 0;
+            } else {
+                if (r === max) {
+                    h = (g - b) / diff;
+                } else if (g === max) {
+                    h = 2 + (b - r) / diff;
+                } else {
+                    h = 4 + (r - g) / diff;
+                }
+                h *= 60;
+                if (h < 0) h += 360;
+            }
+            // Skala dari 0-360 ke 0-179
+            return Math.round(h / 2);
+        }
+
+        // --- Logika Analisis Frame ---
+        function analyzeFrame() {
+            const video = elements.video;
+            const canvas = elements.canvas;
+            
+            if (video.videoWidth === 0 || video.videoHeight === 0) {
+                animationFrameId = requestAnimationFrame(analyzeFrame);
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Ambil sampel piksel dari area tengah (marker)
+            const sampleSize = 20; // Ambil rata-rata dari 40x40 piksel
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            let sumHue = 0;
+            let pixelCount = 0;
+
+            try {
+                // Ambil data piksel di sekitar titik pusat
+                const imageData = ctx.getImageData(centerX - sampleSize / 2, centerY - sampleSize / 2, sampleSize, sampleSize);
+                const data = imageData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    // Kita hanya tertarik pada piksel yang memiliki nilai S dan V yang cukup tinggi
+                    // untuk memastikan itu adalah objek berwarna, bukan bayangan hitam/putih.
+                    // Ini mensimulasikan ambang batas (thresholding) pada S dan V.
+                    const brightness = (r + g + b) / 3;
+                    if (brightness > 50) { // Batas kecerahan dasar
+                        const hue = rgbToHue(r, g, b);
+                        sumHue += hue;
+                        pixelCount++;
+                    }
+                }
+            } catch (e) {
+                console.error("Error accessing pixel data:", e);
+                pixelCount = 0; // Gagal ambil data, atur ke 0
+            }
+
+
+            let avgHue = 0;
+            let classification;
+
+            if (pixelCount > (sampleSize * sampleSize * 0.5)) { // Jika lebih dari 50% piksel valid
+                avgHue = Math.round(sumHue / pixelCount);
+                classification = classifyHue(avgHue);
+            } else {
+                // Objek yang dideteksi tidak cukup besar atau terlalu gelap
+                classification = { status: "Arahkan Objek", key: "none", desc: "Tempatkan pisang di lingkaran fokus" };
+                avgHue = '--';
+            }
+
+            updateDashboard(classification, avgHue);
+
+            animationFrameId = requestAnimationFrame(analyzeFrame);
+        }
+
+        // --- Logika Update Dashboard ---
+        function updateDashboard(classification, avgHue) {
+            const statusKey = classification.key;
+            const data = SENSOR_DATA[statusKey];
+            const sensorData = simulateSensor(classification.status);
+
+            // --- Update Status Card ---
+            const cardClasses = elements.currentStatusCard.classList;
+            cardClasses.remove('border-segar', 'border-optimal', 'border-busuk', 'border-gray-700');
+            cardClasses.add('border-4', data.color.replace('color', 'border'));
+
+            elements.currentStatusCard.innerHTML = `
+                <p class="text-4xl font-extrabold text-white">${classification.status}</p>
+                <p class="text-lg text-gray-300 mt-2">${classification.desc || data.desc}</p>
+            `;
+            
+            // --- Update Hue Value ---
+            elements.hueValueDisplay.textContent = avgHue === '--' ? '--' : avgHue;
+
+            // --- Update Sensor Values ---
+            elements.co2Value.textContent = sensorData.co2.toFixed(1);
+            elements.phValue.textContent = sensorData.ph.toFixed(2);
+            elements.humidityValue.textContent = sensorData.humidity.toFixed(1);
+
+            // --- Update Bar Charts ---
+            elements.co2Bar.style.width = `${(sensorData.co2 / MAX_CO2) * 100}%`;
+            elements.phBar.style.width = `${(sensorData.ph / MAX_PH) * 100}%`;
+            elements.humidityBar.style.width = `${(sensorData.humidity / MAX_HUMIDITY) * 100}%`;
+        }
+
+        // --- Inisialisasi Kamera ---
+        function initCamera() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }) // Coba kamera belakang di mobile
+                    .then(stream => {
+                        elements.video.srcObject = stream;
+                        elements.video.onloadedmetadata = () => {
+                            elements.video.play();
+                            elements.cameraStatus.style.display = 'none';
+                            // Tunggu sebentar agar video stabil sebelum memulai analisis
+                            setTimeout(() => {
+                                animationFrameId = requestAnimationFrame(analyzeFrame);
+                            }, 500);
+                        };
+                    })
+                    .catch(err => {
+                        console.error("Gagal mengakses kamera:", err);
+                        elements.cameraStatus.textContent = "Akses kamera ditolak atau tidak tersedia.";
+                    });
+            } else {
+                elements.cameraStatus.textContent = "Browser tidak mendukung akses kamera (getUserMedia).";
+            }
+        }
+
+        // --- Start ---
+        document.addEventListener('DOMContentLoaded', initCamera);
+
+    </script>
+</body>
 </html>
