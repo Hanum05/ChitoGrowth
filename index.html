@@ -64,7 +64,7 @@
         <!-- Header -->
         <header class="text-center mb-10 p-4 border-b border-gray-700">
             <h1 class="text-3xl sm:text-4xl font-extrabold text-yellow-400 tracking-wider">SMART BANANA LIVE ANALYZER</h1>
-            <p class="text-gray-400 mt-2">Analisis Kematangan Pisang Real-time via Kamera Laptop</p>
+            <p class="text-gray-400 mt-2">Analisis Kematangan Pisang Real-time via Kamera Laptop/Ponsel</p>
         </header>
 
         <!-- Main Dashboard Layout -->
@@ -80,6 +80,16 @@
                     <div id="focus-marker"></div>
                     
                     <p id="camera-status" class="absolute top-1/2 left-0 w-full text-center text-red-400 font-bold z-20">Memuat kamera...</p>
+                </div>
+                
+                <!-- Camera Control Button (New Element) -->
+                <div class="mt-4 flex justify-center">
+                    <button id="camera-switch-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 disabled:opacity-50" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 inline-block mr-2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181-3.181-3.182-3.182A4.5 4.5 0 0116.364 13.91l-3.32 3.32c1.776-.79 3.553-2.614 3.553-2.614zM15.406 13.906a5.524 5.524 0 00-6.702-4.237l-3.32 3.32a5.524 5.524 0 00-4.237 6.702M19.998 7.373A5.524 5.524 0 0013.296 4.19l-3.32 3.32a5.524 5.524 0 00-4.237 6.702M19.644 16.015v4.992m0 0h-4.992m4.992 0l-3.181-3.181-3.182 3.182A4.5 4.5 0 017.636 10.09l3.32-3.32c-1.776.79-3.553 2.614-3.553 2.614z" />
+                        </svg>
+                        Ganti Kamera (<span id="current-camera-mode">Memuat...</span>)
+                    </button>
                 </div>
                 
                 <!-- Hue Value Display -->
@@ -206,6 +216,9 @@
             co2Bar: document.getElementById('co2-bar'),
             phBar: document.getElementById('ph-bar'),
             humidityBar: document.getElementById('humidity-bar'),
+            // New elements for camera control
+            cameraSwitchButton: document.getElementById('camera-switch-button'),
+            currentCameraModeSpan: document.getElementById('current-camera-mode'),
         };
 
         const MAX_CO2 = 600; 
@@ -215,6 +228,8 @@
 
         const ctx = elements.canvas.getContext('2d');
         let animationFrameId;
+        let currentStream = null;
+        let currentFacingMode = 'environment'; // Default: coba kamera belakang
 
         // Fungsi utilitas untuk mendapatkan nilai acak dalam rentang
         const getRandom = (min, max) => (Math.random() * (max - min) + min);
@@ -391,33 +406,88 @@
             elements.phBar.style.width = `${(sensorData.ph / MAX_PH) * 100}%`;
             elements.humidityBar.style.width = `${(sensorData.humidity / MAX_HUMIDITY) * 100}%`;
         }
-
-        // --- Inisialisasi Kamera ---
-        function initCamera() {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }) // Coba kamera belakang di mobile
-                    .then(stream => {
-                        elements.video.srcObject = stream;
-                        elements.video.onloadedmetadata = () => {
-                            elements.video.play();
-                            elements.cameraStatus.style.display = 'none';
-                            // Tunggu sebentar agar video stabil sebelum memulai analisis
-                            setTimeout(() => {
-                                animationFrameId = requestAnimationFrame(analyzeFrame);
-                            }, 500);
-                        };
-                    })
-                    .catch(err => {
-                        console.error("Gagal mengakses kamera:", err);
-                        elements.cameraStatus.textContent = "Akses kamera ditolak atau tidak tersedia.";
-                    });
-            } else {
-                elements.cameraStatus.textContent = "Browser tidak mendukung akses kamera (getUserMedia).";
+        
+        // --- Stream Management ---
+        function stopCamera() {
+            if (currentStream) {
+                // Hentikan semua trek media (video, audio jika ada)
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
             }
         }
 
+        // --- Inisialisasi/Mulai Kamera ---
+        async function startCamera(facingMode) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                elements.cameraStatus.textContent = "Browser tidak mendukung akses kamera (getUserMedia).";
+                elements.cameraSwitchButton.disabled = true;
+                return;
+            }
+
+            stopCamera(); // Pastikan stream lama dihentikan
+            
+            elements.cameraStatus.style.display = 'block';
+            elements.cameraStatus.textContent = `Memuat kamera (${facingMode === 'user' ? 'Depan' : 'Belakang'})...`;
+            elements.cameraSwitchButton.disabled = true;
+            elements.currentCameraModeSpan.textContent = facingMode === 'user' ? 'Depan' : 'Belakang';
+
+
+            const constraints = {
+                video: {
+                    facingMode: facingMode
+                }
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                currentFacingMode = facingMode; // Update mode setelah berhasil
+
+                elements.video.srcObject = stream;
+                elements.video.onloadedmetadata = () => {
+                    elements.video.play();
+                    elements.cameraStatus.style.display = 'none';
+                    elements.cameraSwitchButton.disabled = false;
+                    elements.currentCameraModeSpan.textContent = facingMode === 'user' ? 'Depan' : 'Belakang';
+                    
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    
+                    // Tunggu sebentar agar video stabil sebelum memulai analisis
+                    setTimeout(() => {
+                        animationFrameId = requestAnimationFrame(analyzeFrame);
+                    }, 500);
+                };
+            } catch (err) {
+                console.warn(`Gagal mengakses kamera ${facingMode}:`, err);
+                
+                // Logika Fallback: Jika kamera 'environment' gagal, coba 'user'
+                if (facingMode === 'environment') {
+                    elements.cameraStatus.textContent = "Kamera belakang gagal/tidak ada. Mencoba kamera depan...";
+                    await startCamera('user');
+                } else if (facingMode === 'user') {
+                    // Jika kedua-duanya gagal
+                    elements.cameraStatus.textContent = "Akses kamera ditolak atau tidak tersedia. Silakan cek izin browser Anda.";
+                    elements.cameraSwitchButton.disabled = true;
+                    elements.currentCameraModeSpan.textContent = 'Gagal';
+                }
+            }
+        }
+        
+        function switchCamera() {
+            // Toggle mode: user <-> environment
+            const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+            startCamera(newFacingMode);
+        }
+
+
         // --- Start ---
-        document.addEventListener('DOMContentLoaded', initCamera);
+        document.addEventListener('DOMContentLoaded', () => {
+             // Attach event listener to the switch button
+            elements.cameraSwitchButton.addEventListener('click', switchCamera);
+            
+            // Start with environment camera (back camera on mobile)
+            startCamera(currentFacingMode); 
+        });
 
     </script>
 </body>
