@@ -38,7 +38,10 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Flip horizontally (mirror effect like a selfie cam) */
+        }
+        /* Flip video horizontally only if facingMode is 'user' (Front Camera) */
+        .mirrored {
+             transform: scaleX(-1);
         }
         #canvasElement { display: none; } /* Canvas is used for processing, not display */
         
@@ -82,7 +85,7 @@
                     <p id="camera-status" class="absolute top-1/2 left-0 w-full text-center text-red-400 font-bold z-20">Memuat kamera...</p>
                 </div>
                 
-                <!-- Camera Control Button (New Element) -->
+                <!-- Camera Control Button -->
                 <div class="mt-4 flex justify-center">
                     <button id="camera-switch-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 disabled:opacity-50" disabled>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 inline-block mr-2">
@@ -429,8 +432,13 @@
             elements.cameraStatus.style.display = 'block';
             elements.cameraStatus.textContent = `Memuat kamera (${facingMode === 'user' ? 'Depan' : 'Belakang'})...`;
             elements.cameraSwitchButton.disabled = true;
-            elements.currentCameraModeSpan.textContent = facingMode === 'user' ? 'Depan' : 'Belakang';
-
+            
+            // Atur mode cermin (mirror)
+            if (facingMode === 'user') {
+                elements.video.classList.add('mirrored');
+            } else {
+                elements.video.classList.remove('mirrored');
+            }
 
             const constraints = {
                 video: {
@@ -474,7 +482,7 @@
         }
         
         function switchCamera() {
-            // Toggle mode: user <-> environment
+            // Toggle mode: user (Depan) <-> environment (Belakang)
             const newFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
             startCamera(newFacingMode);
         }
@@ -482,7 +490,7 @@
 
         // --- Start ---
         document.addEventListener('DOMContentLoaded', () => {
-             // Attach event listener to the switch button
+             // ** PENTING: Menghubungkan fungsi switchCamera ke tombol **
             elements.cameraSwitchButton.addEventListener('click', switchCamera);
             
             // Start with environment camera (back camera on mobile)
